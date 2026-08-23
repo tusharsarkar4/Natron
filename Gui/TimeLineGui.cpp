@@ -306,6 +306,7 @@ TimeLineGui::resizeGL(int width,
         height = 1;
     }
     glViewport (0, 0, width, height);
+    Q_EMIT visibleRangeChanged();
 }
 
 void
@@ -1025,6 +1026,7 @@ TimeLineGui::leaveEvent(QEvent* e)
 void
 TimeLineGui::mouseReleaseEvent(QMouseEvent* e)
 {
+    TimelineStateEnum previousState = _imp->state;
     if (_imp->state == eTimelineStateSelectingZoomRange) {
         // - if the last selected frame is the same as the first selected frame, zoom on the PROJECT range
         //   (NOT the playback range as in the following, and NOT adding margins as centerOn() does)
@@ -1077,6 +1079,9 @@ TimeLineGui::mouseReleaseEvent(QMouseEvent* e)
     }
 
     _imp->state = eTimelineStateIdle;
+    if (previousState == eTimelineStatePanning) {
+        Q_EMIT visibleRangeChanged();
+    }
     QOpenGLWidget::mouseReleaseEvent(e);
 } // TimeLineGui::mouseReleaseEvent
 
@@ -1106,6 +1111,7 @@ TimeLineGui::wheelEvent(QWheelEvent* e)
         _imp->updateEditorFrameRanges();
         _imp->updateOpenedViewersFrameRanges();
     }
+    Q_EMIT visibleRangeChanged();
 }
 
 void
@@ -1155,6 +1161,7 @@ TimeLineGui::centerOn_tripleSync(SequenceTime left,
     _imp->tlZoomCtx.zoomFactor = w / curveWidth;
 
     update();
+    Q_EMIT visibleRangeChanged();
 }
 
 void
@@ -1179,6 +1186,7 @@ TimeLineGui::centerOn(SequenceTime left,
     _imp->tlZoomCtx.zoomFactor = w / curveWidth;
 
     update();
+    Q_EMIT visibleRangeChanged();
 }
 
 SequenceTime

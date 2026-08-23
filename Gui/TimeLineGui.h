@@ -174,6 +174,7 @@ private:
 Q_SIGNALS:
 
     void boundariesChanged(SequenceTime, SequenceTime);
+    void visibleRangeChanged();
 
 private:
 

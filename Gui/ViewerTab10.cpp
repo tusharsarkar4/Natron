@@ -446,10 +446,12 @@ ViewerTab::seek(SequenceTime time)
 void
 ViewerTab::previousFrame()
 {
+    int leftBound, rightBound;
+    getTimelineBounds(&leftBound, &rightBound);
     int prevFrame = _imp->timeLineGui->currentFrame() - 1;
 
-    if ( prevFrame  < _imp->timeLineGui->leftBound() ) {
-        prevFrame = _imp->timeLineGui->rightBound();
+    if (prevFrame < leftBound) {
+        prevFrame = rightBound;
     }
     seek(prevFrame);
 }
@@ -457,10 +459,12 @@ ViewerTab::previousFrame()
 void
 ViewerTab::nextFrame()
 {
+    int leftBound, rightBound;
+    getTimelineBounds(&leftBound, &rightBound);
     int nextFrame = _imp->timeLineGui->currentFrame() + 1;
 
-    if ( nextFrame  > _imp->timeLineGui->rightBound() ) {
-        nextFrame = _imp->timeLineGui->leftBound();
+    if (nextFrame > rightBound) {
+        nextFrame = leftBound;
     }
     seek(nextFrame);
 }
@@ -480,13 +484,19 @@ ViewerTab::nextIncrement()
 void
 ViewerTab::firstFrame()
 {
-    seek( _imp->timeLineGui->leftBound() );
+    int leftBound, rightBound;
+    getTimelineBounds(&leftBound, &rightBound);
+    Q_UNUSED(rightBound);
+    seek(leftBound);
 }
 
 void
 ViewerTab::lastFrame()
 {
-    seek( _imp->timeLineGui->rightBound() );
+    int leftBound, rightBound;
+    getTimelineBounds(&leftBound, &rightBound);
+    Q_UNUSED(leftBound);
+    seek(rightBound);
 }
 
 void

@@ -26,7 +26,9 @@
 #include "ViewerTab.h"
 #include "ViewerTabPrivate.h"
 
+#include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <stdexcept>
 
 #include <QDebug>
@@ -35,6 +37,7 @@
 #include <QCheckBox>
 #include <QToolBar>
 
+#include "Engine/EffectInstance.h"
 #include "Engine/Project.h"
 #include "Engine/Node.h"
 #include "Engine/NodeGroup.h" // NodePtr
@@ -121,6 +124,9 @@ ViewerTab::onInputChanged(int inputNb)
     }
 
     //refreshLayerAndAlphaChannelComboBox();
+    if (_imp->frameRangeSource->activeIndex() == eViewerFrameRangeSourceInput) {
+        applyFrameRangeSource(true);
+    }
 } // ViewerTab::onInputChanged
 
 void
@@ -209,6 +215,7 @@ ViewerTab::onPlaybackInButtonClicked()
     _imp->timeLineGui->getBounds(&curIn, &curOut);
     curIn = (SequenceTime)_imp->timeLineGui->getTimeline()->currentFrame();
     curIn = std::min(curIn, curOut);
+    _imp->frameRangeSource->setCurrentIndex_no_emit(eViewerFrameRangeSourceInOut);
     setTimelineBounds(curIn, curOut);
     _imp->timeLineGui->recenterOnBounds();
     onTimelineBoundariesChanged(curIn, curOut);
@@ -222,6 +229,7 @@ ViewerTab::onPlaybackOutButtonClicked()
     _imp->timeLineGui->getBounds(&curIn, &curOut);
     curOut = (SequenceTime)_imp->timeLineGui->getTimeline()->currentFrame();
     curOut = std::max(curIn, curOut);
+    _imp->frameRangeSource->setCurrentIndex_no_emit(eViewerFrameRangeSourceInOut);
     setTimelineBounds(curIn, curOut);
     _imp->timeLineGui->recenterOnBounds();
     onTimelineBoundariesChanged(curIn, curOut);
@@ -235,6 +243,7 @@ ViewerTab::onPlaybackInSpinboxValueChanged(double value)
     _imp->timeLineGui->getBounds(&curIn, &curOut);
     curIn = (SequenceTime)value;
     curIn = std::min(curIn, curOut);
+    _imp->frameRangeSource->setCurrentIndex_no_emit(eViewerFrameRangeSourceInOut);
     setTimelineBounds(curIn, curOut);
     _imp->timeLineGui->recenterOnBounds();
     onTimelineBoundariesChanged(curIn, curOut);
@@ -248,6 +257,7 @@ ViewerTab::onPlaybackOutSpinboxValueChanged(double value)
     _imp->timeLineGui->getBounds(&curIn, &curOut);
     curOut = (SequenceTime)value;
     curOut = std::max(curIn, curOut);
+    _imp->frameRangeSource->setCurrentIndex_no_emit(eViewerFrameRangeSourceInOut);
     setTimelineBounds(curIn, curOut);
     _imp->timeLineGui->recenterOnBounds();
     onTimelineBoundariesChanged(curIn, curOut);
@@ -257,6 +267,9 @@ void
 ViewerTab::setFrameRange(int left,
                          int right)
 {
+    _imp->customFrameRangeIn = left;
+    _imp->customFrameRangeOut = right;
+    _imp->frameRangeSource->setCurrentIndex_no_emit(eViewerFrameRangeSourceInOut);
     setTimelineBounds(left, right);
     onTimelineBoundariesChanged(left, right);
     _imp->timeLineGui->recenterOnBounds();
@@ -266,11 +279,163 @@ void
 ViewerTab::onTimelineBoundariesChanged(SequenceTime first,
                                        SequenceTime second)
 {
+    if (!_imp->applyingFrameRangeSource) {
+        _imp->customFrameRangeIn = (int)first;
+        _imp->customFrameRangeOut = (int)second;
+        _imp->frameRangeSource->setCurrentIndex_no_emit(eViewerFrameRangeSourceInOut);
+    }
+    bool inputSignalsBlocked = _imp->playBackInputSpinbox->blockSignals(true);
+    bool outputSignalsBlocked = _imp->playBackOutputSpinbox->blockSignals(true);
     _imp->playBackInputSpinbox->setValue(first);
     _imp->playBackOutputSpinbox->setValue(second);
+    _imp->playBackInputSpinbox->blockSignals(inputSignalsBlocked);
+    _imp->playBackOutputSpinbox->blockSignals(outputSignalsBlocked);
 
 
     abortViewersAndRefresh();
+}
+
+bool
+ViewerTab::getFrameRangeForSource(int source,
+                                  int* left,
+                                  int* right) const
+{
+    double first = 1.;
+    double last = 1.;
+
+    switch (source) {
+    case eViewerFrameRangeSourceGlobal:
+        getGui()->getApp()->getFrameRange(&first, &last);
+        break;
+    case eViewerFrameRangeSourceInput: {
+        int activeInputs[2] = {-1, -1};
+        _imp->viewerNode->getActiveInputs(activeInputs[0], activeInputs[1]);
+        bool foundInputRange = false;
+        for (int i = 0; i < 2; ++i) {
+            if (activeInputs[i] == -1) {
+                continue;
+            }
+            EffectInstancePtr input = _imp->viewerNode->getInput(activeInputs[i]);
+            if (!input) {
+                continue;
+            }
+            double inputFirst = 1.;
+            double inputLast = 1.;
+            input->getFrameRange_public(input->getRenderHash(), &inputFirst, &inputLast);
+            if (!foundInputRange) {
+                first = inputFirst;
+                last = inputLast;
+                foundInputRange = true;
+            } else {
+                first = std::min(first, inputFirst);
+                last = std::max(last, inputLast);
+            }
+        }
+        if (!foundInputRange) {
+            getGui()->getApp()->getFrameRange(&first, &last);
+        }
+        first = std::floor(first);
+        last = std::ceil(last);
+        break;
+    }
+    case eViewerFrameRangeSourceInOut:
+        first = _imp->customFrameRangeIn;
+        last = _imp->customFrameRangeOut;
+        break;
+    case eViewerFrameRangeSourceVisible:
+        _imp->timeLineGui->getVisibleRange(&first, &last);
+        first = std::floor(first);
+        last = std::ceil(last);
+        break;
+    default:
+        return false;
+    }
+
+    if ( !std::isfinite(first) || !std::isfinite(last) || (first > last) ) {
+        return false;
+    }
+    *left = (int)first;
+    *right = (int)last;
+    return true;
+}
+
+void
+ViewerTab::applyFrameRangeSource(bool recenterTimeline)
+{
+    if (_imp->applyingFrameRangeSource) {
+        return;
+    }
+    int left, right;
+    if ( !getFrameRangeForSource(_imp->frameRangeSource->activeIndex(), &left, &right) ) {
+        return;
+    }
+
+    _imp->applyingFrameRangeSource = true;
+    setTimelineBounds(left, right);
+    onTimelineBoundariesChanged(left, right);
+    _imp->timeLineGui->setFrameRangeEdited(_imp->frameRangeSource->activeIndex() == eViewerFrameRangeSourceInOut);
+    if (recenterTimeline) {
+        _imp->timeLineGui->recenterOnBounds();
+    }
+    _imp->applyingFrameRangeSource = false;
+}
+
+void
+ViewerTab::onFrameRangeSourceChanged(int index)
+{
+    Q_UNUSED(index);
+    applyFrameRangeSource(_imp->frameRangeSource->activeIndex() != eViewerFrameRangeSourceVisible);
+}
+
+void
+ViewerTab::onProjectFrameRangeChangedForSource(int left,
+                                                int right)
+{
+    Q_UNUSED(left);
+    Q_UNUSED(right);
+    if (_imp->frameRangeSource->activeIndex() == eViewerFrameRangeSourceGlobal) {
+        applyFrameRangeSource(true);
+    }
+}
+
+void
+ViewerTab::onTimelineVisibleRangeChanged()
+{
+    if (_imp->frameRangeSource->activeIndex() == eViewerFrameRangeSourceVisible) {
+        applyFrameRangeSource(false);
+    }
+}
+
+int
+ViewerTab::getFrameRangeSource() const
+{
+    return _imp->frameRangeSource->activeIndex();
+}
+
+void
+ViewerTab::getCustomFrameRange(int* left,
+                               int* right) const
+{
+    *left = _imp->customFrameRangeIn;
+    *right = _imp->customFrameRangeOut;
+}
+
+void
+ViewerTab::restoreFrameRangeState(int source,
+                                  int inOutLeft,
+                                  int inOutRight)
+{
+    if ( (source < eViewerFrameRangeSourceGlobal) ||
+         (source > eViewerFrameRangeSourceVisible) ) {
+        source = eViewerFrameRangeSourceGlobal;
+    }
+    if (inOutLeft > inOutRight) {
+        std::swap(inOutLeft, inOutRight);
+    }
+    _imp->customFrameRangeIn = inOutLeft;
+    _imp->customFrameRangeOut = inOutRight;
+    _imp->frameRangeSource->setCurrentIndex_no_emit(source);
+    applyFrameRangeSource(source != eViewerFrameRangeSourceVisible);
 }
 
 void
@@ -579,6 +744,8 @@ void
 ViewerTab::setAsFileDialogViewer()
 {
     _imp->isFileDialogViewer = true;
+    _imp->frameRangeSource->setCurrentIndex_no_emit(eViewerFrameRangeSourceInOut);
+    _imp->frameRangeSource->hide();
 }
 
 bool
@@ -783,6 +950,10 @@ void
 ViewerTab::getTimelineBounds(int* left,
                              int* right) const
 {
+    if ( (_imp->frameRangeSource->activeIndex() == eViewerFrameRangeSourceVisible) &&
+         getFrameRangeForSource(eViewerFrameRangeSourceVisible, left, right) ) {
+        return;
+    }
     return _imp->timeLineGui->getBounds(left, right);
 }
 

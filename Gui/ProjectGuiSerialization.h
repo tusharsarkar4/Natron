@@ -70,7 +70,8 @@ GCC_DIAG_ON(unused-parameter)
 #define VIEWER_DATA_INTRODUCES_PAUSE_VIEWER 12
 #define VIEWER_DATA_INTRODUCES_LAYER 13
 #define VIEWER_DATA_INTRODUCES_FULL_FRAME_PROC 14
-#define VIEWER_DATA_SERIALIZATION_VERSION VIEWER_DATA_INTRODUCES_FULL_FRAME_PROC
+#define VIEWER_DATA_INTRODUCES_FRAME_RANGE_SOURCE 15
+#define VIEWER_DATA_SERIALIZATION_VERSION VIEWER_DATA_INTRODUCES_FRAME_RANGE_SOURCE
 
 #define PROJECT_GUI_INTRODUCES_BACKDROPS 2
 #define PROJECT_GUI_REMOVES_ALL_NODE_PREVIEW_TOGGLED 3
@@ -130,6 +131,8 @@ struct ViewerData
     double fps;
     bool fpsLocked;
     int leftBound, rightBound;
+    int frameRangeSource;
+    int customFrameRangeLeft, customFrameRangeRight;
     int aChoice, bChoice;
     unsigned int version;
 
@@ -182,6 +185,16 @@ struct ViewerData
             ar & ::boost::serialization::make_nvp("RightBound", rightBound);
         } else {
             leftBound = rightBound = 1;
+        }
+
+        if (version >= VIEWER_DATA_INTRODUCES_FRAME_RANGE_SOURCE) {
+            ar & ::boost::serialization::make_nvp("FrameRangeSource", frameRangeSource);
+            ar & ::boost::serialization::make_nvp("CustomFrameRangeLeft", customFrameRangeLeft);
+            ar & ::boost::serialization::make_nvp("CustomFrameRangeRight", customFrameRangeRight);
+        } else {
+            frameRangeSource = 2; // In/Out preserves the historical saved Viewer range.
+            customFrameRangeLeft = leftBound;
+            customFrameRangeRight = rightBound;
         }
 
         if (version >= VIEWER_DATA_INTRODUCES_TOOLBARS_VISIBLITY) {

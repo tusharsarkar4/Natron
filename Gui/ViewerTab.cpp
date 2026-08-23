@@ -745,6 +745,15 @@ ViewerTab::ViewerTab(const std::list<NodeGuiPtr> & existingNodesContext,
     _imp->playbackMode_Button->setIconSize(buttonIconSize);
     _imp->playbackMode_Button->setToolTip( NATRON_NAMESPACE::convertFromPlainText(tr("Behaviour to adopt when the playback hit the end of the range: loop,bounce or stop."), NATRON_NAMESPACE::WhiteSpaceNormal) );
 
+    _imp->frameRangeSource = new ComboBox(_imp->playerButtonsContainer);
+    _imp->frameRangeSource->addItem(tr("Global"), QIcon(), QKeySequence(), tr("Use the project frame range."));
+    _imp->frameRangeSource->addItem(tr("Input"), QIcon(), QKeySequence(), tr("Use the combined frame range of the active Viewer inputs."));
+    _imp->frameRangeSource->addItem(tr("In/Out"), QIcon(), QKeySequence(), tr("Use the custom playback in and out points."));
+    _imp->frameRangeSource->addItem(tr("Visible"), QIcon(), QKeySequence(), tr("Use the frame range currently visible in the timeline."));
+    _imp->frameRangeSource->setCurrentIndex_no_emit(eViewerFrameRangeSourceGlobal);
+    _imp->frameRangeSource->setToolTip( NATRON_NAMESPACE::convertFromPlainText(tr("Select the source used for Viewer playback range."), NATRON_NAMESPACE::WhiteSpaceNormal) );
+    _imp->frameRangeSource->setMaximumWidthFromText(tr("Visible"));
+
 
     TimeLinePtr timeline = getGui()->getApp()->getTimeLine();
     QPixmap tripleSyncUnlockPix, tripleSyncLockedPix;
@@ -959,6 +968,7 @@ ViewerTab::ViewerTab(const std::list<NodeGuiPtr> & existingNodesContext,
     _imp->playerLayout->addWidget(_imp->canEditFpsLabel);
     _imp->playerLayout->addWidget(_imp->fpsBox);
     _imp->playerLayout->addWidget(_imp->timeFormat);
+    _imp->playerLayout->addWidget(_imp->frameRangeSource);
     _imp->playerLayout->addWidget(_imp->turboButton);
     _imp->playerLayout->addWidget(_imp->playbackMode_Button);
     _imp->playerLayout->addSpacing( TO_DPIX(10) );
@@ -1002,7 +1012,9 @@ ViewerTab::ViewerTab(const std::list<NodeGuiPtr> & existingNodesContext,
     _imp->timeLineGui = new TimeLineGui(node, timeline, getGui(), this);
     QObject::connect( _imp->timeLineGui, SIGNAL(boundariesChanged(SequenceTime,SequenceTime)),
                       this, SLOT(onTimelineBoundariesChanged(SequenceTime,SequenceTime)) );
-    QObject::connect( gui->getApp()->getProject().get(), SIGNAL(frameRangeChanged(int,int)), _imp->timeLineGui, SLOT(onProjectFrameRangeChanged(int,int)) );
+    QObject::connect( gui->getApp()->getProject().get(), SIGNAL(frameRangeChanged(int,int)), this, SLOT(onProjectFrameRangeChangedForSource(int,int)) );
+    QObject::connect( _imp->timeLineGui, SIGNAL(visibleRangeChanged()), this, SLOT(onTimelineVisibleRangeChanged()) );
+    QObject::connect( _imp->frameRangeSource, SIGNAL(currentIndexChanged(int)), this, SLOT(onFrameRangeSourceChanged(int)) );
     QObject::connect( _imp->timeFormat, SIGNAL(currentIndexChanged(int)), _imp->timeLineGui, SLOT(onTimeFormatChanged(int)) );
     _imp->timeLineGui->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Minimum);
 
@@ -1013,8 +1025,12 @@ ViewerTab::ViewerTab(const std::list<NodeGuiPtr> & existingNodesContext,
 
     double leftBound, rightBound;
     gui->getApp()->getFrameRange(&leftBound, &rightBound);
+    _imp->customFrameRangeIn = (int)leftBound;
+    _imp->customFrameRangeOut = (int)rightBound;
+    _imp->applyingFrameRangeSource = true;
     _imp->timeLineGui->setBoundaries(leftBound, rightBound);
     onTimelineBoundariesChanged(leftBound, rightBound);
+    _imp->applyingFrameRangeSource = false;
     _imp->timeLineGui->setFrameRangeEdited(false);
     /*================================================*/
 

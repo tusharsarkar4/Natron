@@ -121,6 +121,8 @@ ProjectGuiSerialization::initialize(const ProjectGui* projectGui)
                         viewerData.layerName = tab->getCurrentLayerName().toStdString();
                         viewerData.alphaLayerName = tab->getCurrentAlphaLayerName().toStdString();
                         tab->getTimelineBounds(&viewerData.leftBound, &viewerData.rightBound);
+                        viewerData.frameRangeSource = tab->getFrameRangeSource();
+                        tab->getCustomFrameRange(&viewerData.customFrameRangeLeft, &viewerData.customFrameRangeRight);
                         tab->getActiveInputs(&viewerData.aChoice, &viewerData.bChoice);
                         viewerData.version = VIEWER_DATA_SERIALIZATION_VERSION;
                         _viewersData.insert( std::make_pair(viewer->getNode()->getScriptName_mt_safe(), viewerData) );

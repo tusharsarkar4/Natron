@@ -1099,10 +1099,13 @@ ViewerTab::onActiveInputsChanged()
         manageSlotsForInfoWidget(1, false);
         // _imp->secondInputImage->setEnabled_natron(false);
        }
-       else*/if ( autoWipe && (activeInputs[0] != -1) && (activeInputs[1] != -1) && (activeInputs[0] != activeInputs[1])
+    else*/if ( autoWipe && (activeInputs[0] != -1) && (activeInputs[1] != -1) && (activeInputs[0] != activeInputs[1])
          && (op == eViewerCompositingOperatorNone) ) {
         //_imp->viewer->resetWipeControls();
         setCompositingOperator(eViewerCompositingOperatorWipeUnder);
+    }
+    if (_imp->frameRangeSource->activeIndex() == eViewerFrameRangeSourceInput) {
+        applyFrameRangeSource(true);
     }
 }
 
@@ -1229,6 +1232,10 @@ ViewerTab::onClipPreferencesChanged()
 
         }
 
+    }
+
+    if (_imp->frameRangeSource->activeIndex() == eViewerFrameRangeSourceInput) {
+        applyFrameRangeSource(true);
     }
 
 }

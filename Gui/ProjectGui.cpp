@@ -406,11 +406,19 @@ loadNodeGuiSerialization(Gui* gui,
             if (found->second.bChoice >= 0) {
                 tab->setInputB(found->second.bChoice);
             }
-            if (found->second.version >= VIEWER_DATA_REMOVES_FRAME_RANGE_LOCK) {
-                tab->setFrameRange(found->second.leftBound, found->second.rightBound);
-                tab->setFrameRangeEdited(leftBound != found->second.leftBound || rightBound != found->second.rightBound);
+            if (found->second.version >= VIEWER_DATA_INTRODUCES_FRAME_RANGE_SOURCE) {
+                tab->restoreFrameRangeState(found->second.frameRangeSource,
+                                            found->second.customFrameRangeLeft,
+                                            found->second.customFrameRangeRight);
+                tab->setFrameRangeEdited(found->second.frameRangeSource == eViewerFrameRangeSourceInOut);
+            } else if (found->second.version >= VIEWER_DATA_REMOVES_FRAME_RANGE_LOCK) {
+                const bool wasCustomRange = leftBound != found->second.leftBound || rightBound != found->second.rightBound;
+                tab->restoreFrameRangeState(wasCustomRange ? eViewerFrameRangeSourceInOut : eViewerFrameRangeSourceGlobal,
+                                            found->second.leftBound,
+                                            found->second.rightBound);
+                tab->setFrameRangeEdited(wasCustomRange);
             } else {
-                tab->setFrameRange(leftBound, rightBound);
+                tab->restoreFrameRangeState(eViewerFrameRangeSourceGlobal, leftBound, rightBound);
                 tab->setFrameRangeEdited(false);
             }
             if (!found->second.fpsLocked) {

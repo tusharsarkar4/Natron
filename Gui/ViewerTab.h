@@ -43,6 +43,14 @@
 
 NATRON_NAMESPACE_ENTER
 
+enum ViewerFrameRangeSourceEnum
+{
+    eViewerFrameRangeSourceGlobal = 0,
+    eViewerFrameRangeSourceInput,
+    eViewerFrameRangeSourceInOut,
+    eViewerFrameRangeSourceVisible
+};
+
 typedef std::map<NodePtr, NodeRenderStats > RenderStatsMap;
 
 struct ViewerTabPrivate;
@@ -248,6 +256,10 @@ public:
 
     void setTimelineBounds(int left, int right);
 
+    int getFrameRangeSource() const;
+    void getCustomFrameRange(int* left, int* right) const;
+    void restoreFrameRangeState(int source, int inOutLeft, int inOutRight);
+
     void centerOn(SequenceTime left, SequenceTime right);
 
     ///Calls setTimelineBounds + set the frame range line edit
@@ -310,6 +322,9 @@ public Q_SLOTS:
     void onPlaybackOutButtonClicked();
     void onPlaybackInSpinboxValueChanged(double value);
     void onPlaybackOutSpinboxValueChanged(double value);
+    void onFrameRangeSourceChanged(int index);
+    void onProjectFrameRangeChangedForSource(int left, int right);
+    void onTimelineVisibleRangeChanged();
 
     void onZoomComboboxCurrentIndexChanged(int index);
 
@@ -449,6 +464,8 @@ public Q_SLOTS:
     void toggleTripleSync(bool toggled);
 
 private:
+    bool getFrameRangeForSource(int source, int* left, int* right) const;
+    void applyFrameRangeSource(bool recenterTimeline);
 
     void abortViewersAndRefresh();
 
