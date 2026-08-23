@@ -51,6 +51,12 @@ if [ "$PKGOS" = "Linux" ]; then
     export CPLUS_INCLUDE_PATH="${C_INCLUDE_PATH}"
 fi
 QMAKE="$QTDIR/bin/qmake"
+if [ ! -x "$QMAKE" ] && [ ! -x "${QMAKE}.exe" ]; then
+    VERSIONED_QMAKE="$QTDIR/bin/qmake-qt${QT_VERSION_MAJOR}"
+    if [ -x "$VERSIONED_QMAKE" ] || [ -x "${VERSIONED_QMAKE}.exe" ]; then
+        QMAKE="$VERSIONED_QMAKE"
+    fi
+fi
 
 cd "$TMP_PATH"
 
