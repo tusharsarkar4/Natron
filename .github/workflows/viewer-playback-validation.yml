@@ -1,0 +1,59 @@
+name: Viewer playback validation
+
+on:
+  pull_request:
+    paths:
+      - Engine/ViewerPlaybackCache.h
+      - Engine/OutputSchedulerThread.cpp
+      - Tests/ViewerPlaybackCache_Test.cpp
+      - .github/workflows/viewer-playback-validation.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  native-pages:
+    name: Native mapped-page tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-2022]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Linux compiler and headers
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y g++ python3-dev
+      - name: Windows compiler and headers
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: mingw64
+          update: true
+          install: mingw-w64-x86_64-gcc mingw-w64-x86_64-python
+      - name: Test Linux page preparation
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          g++ -std=c++17 -O2 -pthread -I. $(python3-config --includes) \
+            -ITests/google-test/include -ITests/google-test \
+            Tests/ViewerPlaybackCache_Test.cpp Tests/google-test/src/gtest-all.cc \
+            Tests/google-test/src/gtest_main.cc -o playback-page-tests
+          ./playback-page-tests --gtest_output=xml:playback-page-tests.xml
+      - name: Test Windows page preparation
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          g++ -std=c++17 -O2 -pthread -I. $(python3-config --includes) \
+            -ITests/google-test/include -ITests/google-test \
+            Tests/ViewerPlaybackCache_Test.cpp Tests/google-test/src/gtest-all.cc \
+            Tests/google-test/src/gtest_main.cc -o playback-page-tests.exe
+          ./playback-page-tests.exe --gtest_output=xml:playback-page-tests.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playback-page-tests-${{ matrix.os }}
+          path: playback-page-tests.xml

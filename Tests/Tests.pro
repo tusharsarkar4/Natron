@@ -51,6 +51,7 @@ SOURCES += \
     Lut_Test.cpp \
     OSGLContext_Test.cpp \
     Tracker_Test.cpp \
+    ViewerPlaybackCache_Test.cpp \
     wmain.cpp
 
 HEADERS += \

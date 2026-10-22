@@ -54,6 +54,7 @@
 #include "Engine/EffectInstance.h"
 #include "Engine/Image.h"
 #include "Engine/KnobFile.h"
+#include "Engine/ViewerPlaybackCache.h"
 #include "Engine/Node.h"
 #include "Engine/OpenGLViewerI.h"
 #include "Engine/GenericSchedulerThreadWatcher.h"
@@ -2873,6 +2874,21 @@ private:
                 if (args[i] && args[i]->params) {
                     toAppend.push_back(args[i]->params);
                     args[i].reset();
+                }
+            }
+        }
+        // Retaining cachedData keeps a tile's file mapping valid, but does not
+        // make its pages resident. Fault them in during render-ahead, before
+        // the GUI reads the tile with a PBO mapped. This adds no image copy or
+        // second cache, and retains the scheduler's existing buffering limits.
+        for (BufferableObjectPtrList::const_iterator it = toAppend.begin(); it != toAppend.end(); ++it) {
+            UpdateViewerParamsPtr params = std::dynamic_pointer_cast<UpdateViewerParams>(*it);
+            if (!params || !params->isSequential || params->mustFreeRamBuffer || params->isPartialRect) {
+                continue;
+            }
+            for (std::list<UpdateViewerParams::CachedTile>::const_iterator tile = params->tiles.begin(); tile != params->tiles.end(); ++tile) {
+                if (tile->isCached && tile->cachedData) {
+                    prepareViewerPlaybackCache(tile->ramBuffer, tile->bytesCount);
                 }
             }
         }
