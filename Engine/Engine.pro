@@ -385,6 +385,7 @@ HEADERS += \
     Transform.h \
     UndoCommand.h \
     UpdateViewerParams.h \
+    ViewerPlaybackCache.h \
     Utils.h \
     Variant.h \
     VariantSerialization.h \
